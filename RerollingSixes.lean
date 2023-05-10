@@ -39,7 +39,11 @@ namespace SArray
 protected def push {α n} (a : SArray α n) (x : α) : SArray α (n + 1) :=
   ⟨a.1.push x, by rw [Array.size_push, a.2]⟩
 
-protected def get {α n} (a : SArray α n) (i : Fin n) : α := a.1.get (a.2.symm ▸ i)
+protected def get {α n} (a : SArray α n) (i : Fin n) : α := a.1.get ⟨i, a.2.symm ▸ i.2⟩
+
+theorem get_push {α n} (a : SArray α n) (x : α) (i : Nat) (hi : i < n + 1) :
+    (a.push x).get (⟨i, hi⟩) = (if h : i < n then a.get ⟨i, h⟩ else x) := by
+  simp [SArray.get, SArray.push, Array.get_push, a.2]
 
 protected def empty {α}: SArray α 0 := ⟨Array.empty, rfl⟩
 
@@ -54,6 +58,42 @@ def memoVec {α} (f : (n : Nat) → SArray α n → α) : (n : Nat) → SArray �
 def memo {α} (f : (n : Nat) → (Fin n → α) → α) (n : Nat) : α :=
   let f' (n : Nat) (v : SArray α n) : α := f n v.get
   (memoVec f' (n + 1)).get n
+
+def fix {α} (f : (n : Nat) → (Fin n → α) → α) (n : Nat) : α :=
+  f n (fun ⟨i, _⟩ => fix f i)
+
+lemma memoVec_spec {α} (f : (n : Nat) → (Fin n → α) → α) n : 
+  let f' (n : Nat) (v : SArray α n) : α := f n v.get
+  ∀ i : Fin n, (memoVec f' n).get i = fix f i := by
+    intro f'
+    induction n
+    case zero => 
+      intro ⟨i, hi⟩
+      cases hi
+    case succ n ih =>
+      intro i
+      rw [memoVec]
+      -- TODO: How to unfold local have := more conveniently
+      change SArray.get (SArray.push (memoVec f' n) (f' n (memoVec f' n))) i = fix f ↑i
+      rw [SArray.get_push]
+      split
+      case inl hi =>
+        apply ih
+      case inr hi =>
+        have h : i = Fin.last n := by
+          sorry
+        rcases h
+        rw [fix]
+        change (f _ _ = f _ _) 
+        simp
+        congr with i
+        apply ih
+
+        
+
+#exit
+
+
 
 def vf (p : ℚ) (n : ℕ) (r : Fin n -> ℚ) : ℚ :=
   if hn : n = 0 then 0 else  
