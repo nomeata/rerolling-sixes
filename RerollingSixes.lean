@@ -1,6 +1,7 @@
 import Mathlib.Data.Nat.Choose.Multinomial
 
 import RerollingSixes.NatMemo
+import RerollingSixes.NatMemoAttr
 import RerollingSixes.FastChoose
 
 set_option autoImplicit false
@@ -31,8 +32,8 @@ def vf (p : ℚ) (n : ℕ) (r : ∀ i, i < n -> ℚ) : ℚ :=
     Finset.sup' (Finset.range (n-j)) (by simp) (fun i =>
       (1+i) + r (n-(1+i)) (by aesop (add safe Nat.sub_lt, safe Nat.zero_lt_of_ne_zero)))
 
-def fast_v (p : ℚ) (n : ℕ)  : ℚ :=
-  NatMemo.memo (vf p) n
+-- Cannot use attr yet, due to extra parameters
+def fast_v (p : ℚ) (n : ℕ)  : ℚ := NatMemo.memo (vf p) n
 
 @[csimp]
 lemma v_fast_v : v = fast_v := by

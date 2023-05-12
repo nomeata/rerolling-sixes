@@ -32,7 +32,8 @@ protected def memoVec {α} (f : (n : Nat) → (∀ i, i < n → α) → α ) :
     let v := NatMemo.memoVec f n
     v.push (f n (fun i ih => v.get ⟨i, ih⟩))
 
-def memo {α} (f : (n : Nat) → (∀ i, i < n → α) → α) (n : Nat) : α :=
+-- TODO: Allow universes?
+def memo {α : Type} (f : (n : Nat) → (∀ i, i < n → α) → α) (n : Nat) : α :=
   (NatMemo.memoVec f (n + 1)).get ⟨n, Nat.le_refl _⟩
 
 def fix {α} (f : (n : Nat) → (∀ i, i < n → α) → α) (n : Nat) : α :=
@@ -67,40 +68,21 @@ theorem memo_spec {α}
   (h : ∀ n, f n (fun i _ => g i) = g n) :
   g = memo f := funext (fun _ => (memoVec_spec g f h _ _ _).symm)
 
+theorem fix_eq_memo {α}
+  (f : (n : Nat) → (∀ i, i < n → α) → α)
+  : WellFounded.fix (invImage (fun a => sizeOf a) instWellFoundedRelation).2 f = memo f := by
+    apply memo_spec
+    intro n
+    apply (WellFounded.fix_eq _ _ _).symm
+
+/-
+theorem Brec_eq_memo {α}
+  (f : (n : Nat) → Nat.below n → α)
+  : (fun n => Nat.brecOn n f) = memo f := by
+    apply memo_spec
+    intro n
+    apply (WellFounded.fix_eq _ _ _).symm
+-/
+
+
 end NatMemo
-
-namespace NatMemoDemo
-
-/-
-A small demo. Here a slow implemntation of a recursive function.
-(The if inside is just to please the recursion checker, the condition is always true).
--/
-def slow (n : Nat) : Nat :=
-  1 + List.foldl (fun a i => a + (if _ : i<n then slow i else 0)) 0 (List.range n)
-
--- Kinda slow:
--- #eval (slow 20)
-
-/-
-Define the fast version using the fixed-point version
--/
-def fast (n : Nat) : Nat :=
-  NatMemo.memo (fun n r =>
-    1 + List.foldl (fun a i => a + (if h : i<n then r i h else 0)) 0 (List.range n)
-  ) n
-
-/-
-And prove them to be qual. The csimp attribute makes Lean use the fast version
-when evaluating.
--/
-
-@[csimp]
-theorem slow_is_fast: slow = fast := by
-  apply NatMemo.memo_spec
-  intro n
-  rw [slow]
-  
--- Now faster:
--- #eval (slow 20)
-
-end NatMemoDemo
