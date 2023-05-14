@@ -120,6 +120,13 @@ lemma En_mono {p} (hp : 0 ≤ p) (hp2 : p ≤ 1) (n)
   apply val_nonneg
   positivity
 
+lemma En_le {p} (hp : 0 ≤ p) (hp2 : p ≤ 1) n val q 
+  (hval : ∀ i (hin : i ≤ n), val i hin <= q) :
+  En p n val ≤ q := by
+  calc
+    En p n val ≤ En p n (fun _ _ => q) := En_mono hp hp2 _ _ _ hval
+    _ = q  := En_const _ _ _
+
 lemma v_mono_n {p} (hp : 0 ≤ p) (hp2 : p ≤ 1): Monotone (v p) := by
   have : 0 ≤ (1 - p) := by linarith
   apply monotone_nat_of_le_succ
@@ -134,3 +141,49 @@ lemma v_mono_n {p} (hp : 0 ≤ p) (hp2 : p ≤ 1): Monotone (v p) := by
     have hzero : 0 ∈ Finset.range i := by simp; apply zero_lt_of_ne_zero hiz
     apply Finset.le_sup'_of_le _ hzero
     simp
+
+lemma v_le_n {p} (hp : 0 ≤ p) (hp2 : p ≤ 1) n : v p n ≤ n := by
+  induction' n using Nat.case_strong_induction_on
+  case hz =>
+    rewrite [v]
+    simp
+  case hi n IH =>
+    have IHn := IH n (by linarith)
+    rewrite [v]
+    simp
+    apply En_le hp hp2
+    intro i _hin
+    split
+    case inl =>
+      apply le_trans IHn
+      simp
+    case inr hiz =>
+      rw [Finset.sup'_le_iff]
+      intro j hj
+      calc
+        j + 1 + v p (n - j) ≤ j + 1 + (n - j : ℕ) := by
+          rw [ add_le_add_iff_left ]
+          apply IH
+          simp
+        _ = j + 1 + (n - j) := by
+          congr
+          apply Nat.cast_sub
+          simp at hj
+          linarith
+        _ = n + 1 := by ring
+
+
+-- (√5 - 1)/2 ≤ p
+def phi_le (p : ℚ) := 5 ≤ (2*p + 1)^2
+
+lemma theorem2_1
+  p (hp1 : 0.5 ≤ p) (hp2 : p < 1)
+  n (hn3 : 2 ≤ n) :
+  v p n + 1 ≤ v p (n + 1) :=
+  sorry
+
+lemma theorem2_2
+  p (hp1 : phi_le p) (hp2 : p < 1)
+  n (hn3 : 1 ≤ n) :
+  v p n + 1 ≤ v p (n + 1) :=
+  sorry
