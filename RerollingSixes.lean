@@ -290,10 +290,22 @@ lemma choose_sub_1
   . simp at hn 
   . apply Nat.choose_succ_self_right
 
+
+lemma sup'_eq_of_max
+  {α β} [SemilatticeSup β]
+  {s : Finset α}
+  {hs f i} 
+  (hi : i ∈ s)
+  (x : β)
+  (heq : f i = x)
+  (hle : ∀ i ∈ s, f i ≤ x)
+  : Finset.sup' s hs f = x :=
+  sorry
+
 lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
   ∀ n, v p n = v_simp p n := by
   intro n
-  rw [v_simp]
+  unfold v_simp
   split
   case inl hnle2 => rw [v]
   case inr h2len =>
@@ -311,8 +323,10 @@ lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
       case ha => 
         intros i h0i hin2
         rw [dif_neg (Nat.not_eq_zero_of_lt h0i)]
-        apply le_antisymm
-        . apply Finset.sup'_le
+        have hmem : 0 ∈ Finset.range i := by simp [h0i]
+        apply sup'_eq_of_max hmem 
+        case heq => simp [add_comm]
+        case hle =>
           intro j hji
           simp only [Finset.mem_range] at hji
           have this1 : v p (n - (j + 1)) = v p ((n-1) - j) := by
@@ -321,15 +335,35 @@ lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
           have this2 : (j + v p ((n-1) - j)) ≤ v p (n-1) := by 
             apply iter_le_sub_1
             . apply theorem2_1 _ hp1 hp2
-            . sorry
+            . linarith
             . sorry
           linarith
-        . sorry
-      case hb =>
-        sorry
+      case hb => simp [bc]
       case hc =>
-        sorry
+        rw [dif_neg hnn0]
+        have hmem : (n-1) ∈ Finset.range n := by sorry
+        rw [sup'_eq_of_max hmem (n:ℚ)]
+        case heq =>
+          rw [ Nat.sub_add_cancel h1n]
+          unfold v
+          simp
+          rw [ cast_sub h1n ]
+          simp
+        case hle =>
+          intro i hin
+          simp at hin
+          apply @le_trans -- _ ((i:ℚ) + 1 + (n - (i + 1)))
+          . apply add_le_add_left
+            apply v_le_n (by { trans 0.5; rfl; exact hp1}) (le_of_lt hp2)
+          . rw [ cast_sub, cast_add ]
+            simp
+            apply succ_le_of_lt hin
+        next =>
+          simp [bc]
+          left
+          ring
       case hd =>
+      
         sorry
     . rw [bc]
       simp only [choose_sub_1 _ hnn0]
