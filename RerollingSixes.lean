@@ -309,13 +309,20 @@ lemma sup'_eq_of_max
   (x : β)
   (heq : f i = x)
   (hle : ∀ i ∈ s, f i ≤ x)
-  : Finset.sup' s hs f = x :=
-  sorry
+  : Finset.sup' s hs f = x := by
+  apply le_antisymm
+  . apply Finset.sup'_le _ _ hle
+  . apply Finset.le_sup'_of_le _ hi
+    rw [heq]
+
 
 /- With n heads, it's best to fix all heads -/
 lemma all_heads_is_great 
-  p (hp1 : 0.5 ≤ p) (hp2 : p < 1) n (h1n: 1 ≤ n) hr :
+  p (hp1 : 0.5 ≤ p) (hp2 : p < 1) n hr :
   Finset.sup' (Finset.range n) hr (fun j => ↑j + 1 + v p (n - (j + 1))) = n := by
+  have h1n : 1 ≤ n := by
+    simp at hr
+    exact Nat.succ_le_of_lt (Nat.zero_lt_of_ne_zero hr)
   have hmem : (n-1) ∈ Finset.range n := by
     simp
     apply Nat.sub_lt_left_of_lt_add h1n
@@ -336,11 +343,6 @@ lemma all_heads_is_great
     . rw [ cast_sub, cast_add ]
       simp
       apply succ_le_of_lt hin
-
-lemma almost_all_heads_is_great 
-  p (hp1 : 0.5 ≤ p) (hp2 : p < 1) n (h1n: 1 ≤ n) hr :
-  Finset.sup' (Finset.range (n-1)) hr (fun j => ↑j + 1 + v p (n - (j + 1))) =
-    max (v p (n-1) + 1) (v p 1 + n -1) := sorry
 
 /- With 0 < i < n-1 heads, it's best to fix one head -/
 lemma best_is_to_fix_just_one 
@@ -372,6 +374,25 @@ lemma best_is_to_fix_just_one
         apply hin2
     linarith  
 
+lemma almost_all_heads_is_great 
+  p (hp1 : 0.5 ≤ p) (hp2 : p < 1) n hr :
+  Finset.sup' (Finset.range (n-1)) hr (fun j => ↑j + 1 + v p (n - (j + 1))) =
+    max (v p (n-1) + 1) (v p 1 + n -1) := by
+  replace hr : 1 < n := by simp at hr; assumption
+  cases' n with n; simp at hr
+  cases' n with n; simp at hr
+  cases' n with n; simp [add_sub_assoc, add_comm]
+  simp_rw [Nat.succ_sub_one]
+  simp_rw [Finset.range_succ]
+  rw [Finset.sup'_insert (by simp)]
+  simp_rw [<- Finset.range_succ]
+  rw [sup_eq_max]
+  rw [max_comm]
+  congr 1
+  . rw [best_is_to_fix_just_one p hp1 hp2 _ _ (by simp) (by simp) ]
+    rfl
+  . simp; ring
+
 lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
   ∀ n, v p n = v_simp p n := by
   intro n
@@ -385,7 +406,6 @@ lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
       cases' n with n; simp at hnn0
       cases' n with n; simp at h2len
       simp
-    have h1n : 1 ≤ n := by linarith
     simp only [dif_neg, hnn0]
     apply (@Eq.trans _ _
       ((v p (n-1) + 1)
@@ -401,7 +421,7 @@ lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
       case hb => simp [bc]
       case hc =>
         rw [dif_neg hnn0]
-        rw [all_heads_is_great _ hp1 hp2 _ h1n]
+        rw [all_heads_is_great _ hp1 hp2]
         simp [bc]
         left
         ring
@@ -409,12 +429,13 @@ lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
         rw [dif_neg hnn10]
         congr 1
         apply eq_sub_of_add_eq
-        rw [almost_all_heads_is_great _ hp1 hp2 _ h1n]
+        rw [almost_all_heads_is_great _ hp1 hp2]
         rw [<- max_add_add_right]
         congr 1
         . simp
         . simp; ring
     . rw [bc]
+      have h1n : 1 ≤ n := by linarith
       simp only [choose_sub_1 _ hnn0]
-      simp only [ Nat.sub_sub_self h1n, pow_one]
+      simp only [Nat.sub_sub_self h1n, pow_one]
       ring
