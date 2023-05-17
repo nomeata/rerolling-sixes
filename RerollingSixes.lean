@@ -205,6 +205,16 @@ def iter_le_sub_1
       apply Nat.le_trans hj
       apply Nat.sub_le
 
+@[simp]
+lemma v_0 p : v p 0 = 0 := rfl
+
+@[simp]
+lemma v_1 p : v p 1 = p := by
+  unfold v En
+  simp
+  rw [ Finset.sum_fin_eq_sum_range, Finset.range_succ ]
+  simp [bc]
+
 -- (√5 - 1)/2 ≤ p
 def phi_le (p : ℚ) := 5 ≤ (2*p + 1)^2
 
@@ -302,6 +312,66 @@ lemma sup'_eq_of_max
   : Finset.sup' s hs f = x :=
   sorry
 
+/- With n heads, it's best to fix all heads -/
+lemma all_heads_is_great 
+  p (hp1 : 0.5 ≤ p) (hp2 : p < 1) n (h1n: 1 ≤ n) hr :
+  Finset.sup' (Finset.range n) hr (fun j => ↑j + 1 + v p (n - (j + 1))) = n := by
+  have hmem : (n-1) ∈ Finset.range n := by
+    simp
+    apply Nat.sub_lt_left_of_lt_add h1n
+    simp
+  apply sup'_eq_of_max hmem
+  case heq =>
+    rw [ Nat.sub_add_cancel h1n]
+    unfold v
+    simp
+    rw [ cast_sub h1n ]
+    simp
+  case hle =>
+    intro i hin
+    simp at hin
+    apply @le_trans
+    . apply add_le_add_left
+      apply v_le_n (by { trans 0.5; rfl; exact hp1}) (le_of_lt hp2)
+    . rw [ cast_sub, cast_add ]
+      simp
+      apply succ_le_of_lt hin
+
+lemma almost_all_heads_is_great 
+  p (hp1 : 0.5 ≤ p) (hp2 : p < 1) n (h1n: 1 ≤ n) hr :
+  Finset.sup' (Finset.range (n-1)) hr (fun j => ↑j + 1 + v p (n - (j + 1))) =
+    max (v p (n-1) + 1) (v p 1 + n -1) := sorry
+
+/- With 0 < i < n-1 heads, it's best to fix one head -/
+lemma best_is_to_fix_just_one 
+  p (hp1 : 0.5 ≤ p) (hp2 : p < 1)
+  n 
+  i (h0i : 0 < i) (hin2 : i < n - 1) hr:
+  Finset.sup' (Finset.range i) hr (fun j => ↑j + 1 + v p (n - (j + 1)))
+    = v p (n - 1) + 1 := by
+  have hmem : 0 ∈ Finset.range i := by simp [h0i]
+  apply sup'_eq_of_max hmem 
+  case heq => simp [add_comm]
+  case hle =>
+    intro j hji
+    simp only [Finset.mem_range] at hji
+    have this1 : v p (n - (j + 1)) = v p ((n-1) - j) := by
+      congr 1
+      rw [Nat.sub_sub, Nat.add_comm]
+    have this2 : (j + v p ((n-1) - j)) ≤ v p (n-1) := by 
+      apply iter_le_sub_1
+      . apply theorem2_1 _ hp1 hp2
+      . linarith
+      . rw [Nat.sub_sub, Nat.add_comm, <- Nat.sub_sub]
+        apply le_sub_of_add_le
+        apply succ_le_of_lt
+        apply lt_of_lt_of_le hji
+        apply le_sub_of_add_le
+        apply succ_le_of_lt
+        apply add_lt_of_lt_sub
+        apply hin2
+    linarith  
+
 lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
   ∀ n, v p n = v_simp p n := by
   intro n
@@ -311,6 +381,10 @@ lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
   case inr h2len =>
     rw [v]
     have hnn0 : n ≠ 0 := by linarith
+    have hnn10 : n - 1 ≠ 0 := by
+      cases' n with n; simp at hnn0
+      cases' n with n; simp at h2len
+      simp
     have h1n : 1 ≤ n := by linarith
     simp only [dif_neg, hnn0]
     apply (@Eq.trans _ _
@@ -323,48 +397,23 @@ lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
       case ha => 
         intros i h0i hin2
         rw [dif_neg (Nat.not_eq_zero_of_lt h0i)]
-        have hmem : 0 ∈ Finset.range i := by simp [h0i]
-        apply sup'_eq_of_max hmem 
-        case heq => simp [add_comm]
-        case hle =>
-          intro j hji
-          simp only [Finset.mem_range] at hji
-          have this1 : v p (n - (j + 1)) = v p ((n-1) - j) := by
-            congr 1
-            rw [Nat.sub_sub, Nat.add_comm]
-          have this2 : (j + v p ((n-1) - j)) ≤ v p (n-1) := by 
-            apply iter_le_sub_1
-            . apply theorem2_1 _ hp1 hp2
-            . linarith
-            . sorry
-          linarith
+        apply best_is_to_fix_just_one _ hp1 hp2 _ _ h0i hin2 
       case hb => simp [bc]
       case hc =>
         rw [dif_neg hnn0]
-        have hmem : (n-1) ∈ Finset.range n := by sorry
-        rw [sup'_eq_of_max hmem (n:ℚ)]
-        case heq =>
-          rw [ Nat.sub_add_cancel h1n]
-          unfold v
-          simp
-          rw [ cast_sub h1n ]
-          simp
-        case hle =>
-          intro i hin
-          simp at hin
-          apply @le_trans -- _ ((i:ℚ) + 1 + (n - (i + 1)))
-          . apply add_le_add_left
-            apply v_le_n (by { trans 0.5; rfl; exact hp1}) (le_of_lt hp2)
-          . rw [ cast_sub, cast_add ]
-            simp
-            apply succ_le_of_lt hin
-        next =>
-          simp [bc]
-          left
-          ring
+        rw [all_heads_is_great _ hp1 hp2 _ h1n]
+        simp [bc]
+        left
+        ring
       case hd =>
-      
-        sorry
+        rw [dif_neg hnn10]
+        congr 1
+        apply eq_sub_of_add_eq
+        rw [almost_all_heads_is_great _ hp1 hp2 _ h1n]
+        rw [<- max_add_add_right]
+        congr 1
+        . simp
+        . simp; ring
     . rw [bc]
       simp only [choose_sub_1 _ hnn0]
       simp only [ Nat.sub_sub_self h1n, pow_one]
