@@ -176,35 +176,6 @@ lemma v_le_n {p} (hp : 0 ≤ p) (hp2 : p ≤ 1) n : v p n ≤ n := by
         _ = n + 1 := by ring
 
 
-def iter_le_plus_1
-  (f : ℕ → ℚ) n₀ 
-  (hf : ∀ n ≥ n₀, f n + 1 ≤ f (n + 1)) :
-  ∀ n ≥ n₀, ∀ j, f n + j ≤ f (n + j) := by
-  intros n hn j
-  induction j
-  case zero => simp
-  case succ j IH => calc
-    f n + (succ j) = (f n + j) + 1 := by simp [add_assoc]
-    _ ≤ f (n + j) + 1 := add_le_add_right IH 1
-    _ ≤ f (n + j + 1) := by apply hf; linarith
-
-def iter_le_sub_1
-  (f : ℕ → ℚ) n₀ 
-  (hf : ∀ n ≥ n₀, f n + 1 ≤ f (n + 1)) :
-  ∀ n ≥ n₀, ∀ j ≤ n - n₀, j + f (n - j) ≤ f n := by
-  intros n hn j hj
-  calc
-    j + f (n - j) = f (n - j) + j := add_comm _ _
-    _ ≤ f (n - j + j) := by
-      apply iter_le_plus_1 f n₀ hf _ _ _
-      rw [Nat.le_sub_iff_add_le hn] at hj
-      apply Nat.le_sub_of_add_le
-      linarith
-    _ = f n := by
-      rw [Nat.sub_add_cancel ]
-      apply Nat.le_trans hj
-      apply Nat.sub_le
-
 @[simp]
 lemma v_0 p : v p 0 = 0 := rfl
 
@@ -218,14 +189,47 @@ lemma v_1 p : v p 1 = p := by
 -- (√5 - 1)/2 ≤ p
 def phi_le (p : ℚ) := 5 ≤ (2*p + 1)^2
 
-lemma theorem2_1 p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
-  ∀ n ≥ 2, v p n + 1 ≤ v p (n + 1) :=
-  sorry
+/- A predicate that it’s not useful to continue with n coins,
+when one can continue with n+1 coins -/
+def pointless (p : ℚ) n := v p n + 1 ≤ v p (n + 1)
 
-lemma theorem2_2
-  p (hp1 : phi_le p) (hp2 : p < 1) :
-  ∀ n ≥ 1, v p n + 1 ≤ v p (n + 1) :=
-  sorry
+def iter_fast_growth_add
+  (f : ℕ → ℚ) n₀ n
+  (hf : ∀ i ≥ n₀, i < n → f i + 1 ≤ f (i + 1)) :
+  ∀ i j, n₀ ≤ i → i + j ≤ n → f i + j ≤ f (i + j) := by
+  intros i j hi hj
+  induction j
+  case zero => simp
+  case succ j IH => calc
+    f i + (succ j) = (f i + j) + 1 := by simp [add_assoc]
+    _ ≤ f (i + j) + 1 := by
+      apply add_le_add_right
+      apply IH
+      linarith
+    _ ≤ f (i + j + 1) := by
+      apply hf
+      . linarith
+      . linarith
+
+def iter_fast_growth_sub
+  (f : ℕ → ℚ) n₀ n (hn0n : n₀ ≤ n)
+  (hf : ∀ i ≥ n₀, i < n → f i + 1 ≤ f (i + 1)) :
+  ∀ j ≤ n - n₀, j + f (n - j) ≤ f n := by
+  intros j hj
+  calc
+    j + f (n - j) = f (n - j) + j := add_comm _ _
+    _ ≤ f (n - j + j) := by
+      apply iter_fast_growth_add f n₀ _ hf 
+      . apply Nat.le_sub_of_add_le
+        rw [add_comm]
+        apply Nat.add_le_of_le_sub hn0n hj
+      . rw [Nat.le_sub_iff_add_le hn0n] at hj
+        rw [Nat.sub_add_cancel]
+        linarith
+    _ = f n := by
+      rw [Nat.sub_add_cancel ]
+      apply Nat.le_trans hj
+      apply Nat.sub_le
 
 def v_simp p n :=
   if n ≤ 2 then v p n
@@ -346,8 +350,8 @@ lemma all_heads_is_great
 
 /- With 0 < i < n-1 heads, it's best to fix one head -/
 lemma best_is_to_fix_just_one 
-  p (hp1 : 0.5 ≤ p) (hp2 : p < 1)
-  n 
+  p n
+  (hpointless : ∀ i, 2 ≤ i → i < n - 1 → pointless p i)
   i (h0i : 0 < i) (hin2 : i < n - 1) hr:
   Finset.sup' (Finset.range i) hr (fun j => ↑j + 1 + v p (n - (j + 1)))
     = v p (n - 1) + 1 := by
@@ -361,9 +365,10 @@ lemma best_is_to_fix_just_one
       congr 1
       rw [Nat.sub_sub, Nat.add_comm]
     have this2 : (j + v p ((n-1) - j)) ≤ v p (n-1) := by 
-      apply iter_le_sub_1
-      . apply theorem2_1 _ hp1 hp2
+      apply iter_fast_growth_sub _ 2
       . linarith
+      . intro j hj1 hj2
+        apply hpointless _ hj1 hj2
       . rw [Nat.sub_sub, Nat.add_comm, <- Nat.sub_sub]
         apply le_sub_of_add_le
         apply succ_le_of_lt
@@ -375,7 +380,8 @@ lemma best_is_to_fix_just_one
     linarith  
 
 lemma almost_all_heads_is_great 
-  p (hp1 : 0.5 ≤ p) (hp2 : p < 1) n hr :
+  p n hr 
+  (hpointless : ∀ i, 2 ≤ i → i < n - 1 → pointless p i) :
   Finset.sup' (Finset.range (n-1)) hr (fun j => ↑j + 1 + v p (n - (j + 1))) =
     max (v p (n-1) + 1) (v p 1 + n -1) := by
   replace hr : 1 < n := by simp at hr; assumption
@@ -389,13 +395,13 @@ lemma almost_all_heads_is_great
   rw [sup_eq_max]
   rw [max_comm]
   congr 1
-  . rw [best_is_to_fix_just_one p hp1 hp2 _ _ (by simp) (by simp) ]
+  . rw [best_is_to_fix_just_one p _ hpointless _ (by simp) (by simp) ]
     rfl
   . simp; ring
 
-lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
-  ∀ n, v p n = v_simp p n := by
-  intro n
+lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) n
+  (hpointless : ∀ i, 2 ≤ i → i < n - 1 → pointless p i) :
+  v p n = v_simp p n := by
   unfold v_simp
   split
   case inl hnle2 => rw [v]
@@ -417,7 +423,7 @@ lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
       case ha => 
         intros i h0i hin2
         rw [dif_neg (Nat.not_eq_zero_of_lt h0i)]
-        apply best_is_to_fix_just_one _ hp1 hp2 _ _ h0i hin2 
+        apply best_is_to_fix_just_one _ _ hpointless _ h0i hin2 
       case hb => simp [bc]
       case hc =>
         rw [dif_neg hnn0]
@@ -429,7 +435,7 @@ lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
         rw [dif_neg hnn10]
         congr 1
         apply eq_sub_of_add_eq
-        rw [almost_all_heads_is_great _ hp1 hp2]
+        rw [almost_all_heads_is_great p n _ hpointless ]
         rw [<- max_add_add_right]
         congr 1
         . simp
@@ -439,3 +445,12 @@ lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
       simp only [choose_sub_1 _ hnn0]
       simp only [Nat.sub_sub_self h1n, pow_one]
       ring
+
+lemma theorem2_1 p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
+  ∀ n ≥ 2, pointless p n :=
+  sorry
+
+lemma theorem2_2
+  p (hp1 : phi_le p) (hp2 : p < 1) :
+  ∀ n ≥ 1, pointless p n :=
+  sorry
