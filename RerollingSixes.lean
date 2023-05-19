@@ -3,6 +3,7 @@ import Mathlib.Data.Nat.Choose.Multinomial
 import RerollingSixes.NatMemo
 import RerollingSixes.NatMemoAttr
 import RerollingSixes.FastChoose
+import RerollingSixes.NatSubElim
 
 set_option autoImplicit false
 
@@ -11,6 +12,17 @@ open BigOperators Nat
 /- Binomial Expectation operator -/
 def bc (p : ℚ) (n : ℕ) (i : ℕ) : ℚ :=
   p^(i : ℕ) * (1-p)^(n - i) * n.choose i
+
+@[simp]
+lemma bc_0 p n : bc p n 0 = (1-p)^n := by simp [bc]
+
+@[simp]
+lemma bc_1 p n : bc p n 1 = p * (1-p)^(n-1) * n := by simp [bc]
+
+@[simp]
+lemma bc_n p n : bc p n n = p^n := by simp [bc]
+
+  
     
 def En (p : ℚ) (n : ℕ) (val : ∀ i, i ≤ n -> ℚ) : ℚ :=
   ∑ j : Fin (n+1), bc p n j * val j (le_of_lt_succ j.2)
@@ -186,8 +198,16 @@ lemma v_1 p : v p 1 = p := by
   rw [ Finset.sum_fin_eq_sum_range, Finset.range_succ ]
   simp [bc]
 
+@[simp]
+lemma v_2 p (hp2 : p ≤ 1) : v p 2 = 3*p - p^3 := by
+  unfold v En
+  simp [ Finset.sum_fin_eq_sum_range, Finset.range_succ,
+      Finset.sum_insert, sup_eq_max ]
+  rw [ max_eq_left (by linarith) ]
+  ring
+
 -- (√5 - 1)/2 ≤ p
-def phi_le (p : ℚ) := 5 ≤ (2*p + 1)^2
+def phi_le (p : ℚ) := 0 < p ∧ 5 ≤ (2*p + 1)^2
 
 /- A predicate that it’s not useful to continue with n coins,
 when one can continue with n+1 coins -/
@@ -231,14 +251,6 @@ def iter_fast_growth_sub
       apply Nat.le_trans hj
       apply Nat.sub_le
 
-def v_simp p n :=
-  if n ≤ 2 then v p n
-  else 
-  v p (n-1) + 1 +
-  p^n * (n - 1 - v p (n-1)) +
-  n * p^(n-1) * (1-p) * max 0 (n - 2 + p - v p (n-1) ) -
-  (1 - p)^n
-
 lemma En_upd p n f i (hi : i ≤ n) (q : ℚ)
   : En p n f = En p n (fun j hj => if j = i then q else f j hj)
               + bc p n i * (f i hi - q) := by
@@ -273,29 +285,36 @@ lemma En_eq_various_sums p n f a b c d
     cases' n with n; cases hn
     simp
   have h0nn : 0 ≠ n := by
+    nat_intervals
+    /-
     cases' n with n; cases hn
     simp
+    -/
   have h0n1 : 0 ≠ n -1 := by
+    -- nat_intervals
     cases' n with n; cases hn
     have hn : 2 ≤ n := by linarith
     cases' n with n; cases hn
     simp
     linarith
   rw [En_upd p n _ (n-1) (by simp) a]; rw [hd]; congr 1
-  rw [En_upd p n _ n (by simp) a]; simp [hnn1 ]; rw [hc]; congr 1
-  rw [En_upd p n _ 0 (by simp) a]; simp [h0nn, h0n1 ]; rw [hb]; congr 1
+  rw [En_upd p n _ n (by simp) a]; simp [hnn1 ]; rw [hc]; simp; congr 1
+  rw [En_upd p n _ 0 (by simp) a]; simp [h0nn, h0n1 ]; rw [hb]; simp; congr 1
   conv => right; apply (En_const p n _).symm
   congr
   funext j hj
   simp
   intros hj1 hj2 hj3
   apply ha
-  . simp [*, zero_lt_of_ne_zero]
-  . simp [*]
+  . nat_intervals
+    -- simp [*, zero_lt_of_ne_zero]
+  . nat_intervals
+    /-
     apply Nat.lt_of_le_of_ne _ hj3
     apply Nat.le_sub_of_add_le
     apply Nat.succ_le_of_lt
     apply Nat.lt_of_le_of_ne hj hj2
+    -/
 
 @[simp]
 lemma choose_sub_1
@@ -322,15 +341,19 @@ lemma sup'_eq_of_max
 
 /- With n heads, it's best to fix all heads -/
 lemma all_heads_is_great 
-  p (hp1 : 0.5 ≤ p) (hp2 : p < 1) n hr :
+  p (hp1 : 1/2 ≤ p) (hp2 : p < 1) n hr :
   Finset.sup' (Finset.range n) hr (fun j => ↑j + 1 + v p (n - (j + 1))) = n := by
   have h1n : 1 ≤ n := by
     simp at hr
-    exact Nat.succ_le_of_lt (Nat.zero_lt_of_ne_zero hr)
+    nat_intervals
+    -- exact Nat.succ_le_of_lt (Nat.zero_lt_of_ne_zero hr)
   have hmem : (n-1) ∈ Finset.range n := by
     simp
+    nat_intervals
+    /-
     apply Nat.sub_lt_left_of_lt_add h1n
     simp
+    -/
   apply sup'_eq_of_max hmem
   case heq =>
     rw [ Nat.sub_add_cancel h1n]
@@ -343,10 +366,11 @@ lemma all_heads_is_great
     simp at hin
     apply @le_trans
     . apply add_le_add_left
-      apply v_le_n (by { trans 0.5; rfl; exact hp1}) (le_of_lt hp2)
+      apply v_le_n (by linarith) (le_of_lt hp2)
     . rw [ cast_sub, cast_add ]
       simp
-      apply succ_le_of_lt hin
+      nat_intervals
+      -- apply succ_le_of_lt hin
 
 /- With 0 < i < n-1 heads, it's best to fix one head -/
 lemma best_is_to_fix_just_one 
@@ -370,6 +394,9 @@ lemma best_is_to_fix_just_one
       . intro j hj1 hj2
         apply hpointless _ hj1 hj2
       . rw [Nat.sub_sub, Nat.add_comm, <- Nat.sub_sub]
+        
+        nat_intervals
+        /-
         apply le_sub_of_add_le
         apply succ_le_of_lt
         apply lt_of_lt_of_le hji
@@ -377,6 +404,7 @@ lemma best_is_to_fix_just_one
         apply succ_le_of_lt
         apply add_lt_of_lt_sub
         apply hin2
+        -/
     linarith  
 
 lemma almost_all_heads_is_great 
@@ -399,7 +427,15 @@ lemma almost_all_heads_is_great
     rfl
   . simp; ring
 
-lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) n
+def v_simp p n :=
+  if n ≤ 2 then v p n
+  else 
+  v p (n-1) + 1 +
+  p^n * (n - 1 - v p (n-1)) +
+  n * p^(n-1) * (1-p) * max 0 (n - 2 + p - v p (n-1) ) -
+  (1 - p)^n
+
+lemma v_eq_v_simp p (hp1 : 1/2 ≤ p) (hp2 : p < 1) n
   (hpointless : ∀ i, 2 ≤ i → i < n - 1 → pointless p i) :
   v p n = v_simp p n := by
   unfold v_simp
@@ -409,9 +445,12 @@ lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) n
     rw [v]
     have hnn0 : n ≠ 0 := by linarith
     have hnn10 : n - 1 ≠ 0 := by
+      nat_intervals
+      /-
       cases' n with n; simp at hnn0
       cases' n with n; simp at h2len
       simp
+      -/
     simp only [dif_neg, hnn0]
     apply (@Eq.trans _ _
       ((v p (n-1) + 1)
@@ -445,6 +484,76 @@ lemma v_eq_v_simp p (hp1 : 0.5 ≤ p) (hp2 : p < 1) n
       simp only [choose_sub_1 _ hnn0]
       simp only [Nat.sub_sub_self h1n, pow_one]
       ring
+
+
+lemma lemma1 
+  p (hp1 : phi_le p) (hp2 : p < 1) :
+  ∀ n, v p (n+1) + 1 ≤ v p (n+2)
+       ∧ v p (n+2) < (n+2) - ((1-p)/p)^(n+3) := by
+  intro n
+  rw [phi_le] at hp1
+  have hp3 : 1 < 2 * p := by nlinarith
+  induction n using Nat.case_strong_induction_on
+  case hz =>
+    norm_num
+    constructor
+    . rw [ v_2 _ (le_of_lt hp2) ]
+      nlinarith
+    . apply lt_of_mul_lt_mul_right _ (by nlinarith : 0 ≤ p^3)
+      rw [ v_2 _ (le_of_lt hp2), sub_mul, sub_mul, div_mul_cancel ]
+      case h => nlinarith
+      apply lt_of_sub_neg
+      rw [(by nlinarith : 
+        3 * p * p ^ 3 - p ^ 3 * p ^ 3 - (2 * p^3 - (1 - p) ^ 3)
+        = - (p-1)^2 * (p^4 + 2*p^3 + p -1 )) ]
+      apply mul_neg_of_neg_of_pos 
+      . nlinarith
+      . have : 1 < 2 * p := by nlinarith
+        calc
+          p ^ 4 + 2 * p ^ 3 + p - 1 ≥ 2 * p ^ 3 + p - 1 := by nlinarith
+          _ > p ^ 2 + p - 1 := by nlinarith
+          _ ≥ 0 := by nlinarith
+  case hi n IH =>
+    simp only [<- add_one, add_assoc, cast_add]
+    norm_num
+    rewrite [(?eq :
+      v p (n + 3) = v p (n + 2) + 1 + p^(n+3) * (n+2 - v p (n+2)) - (1-p)^(n+3))]
+    case eq =>
+      trans
+      . apply v_eq_v_simp p (by nlinarith) hp2
+        . intro i hi1 hi2 
+          unfold pointless
+          have : i - 1 ≤ n := by nat_intervals
+          replace IH : _ := (IH (i - 1) this).1
+          rw [(by cases i; simp at hi1; simp : i - 1 + 1 = i)] at IH
+          rw [(by cases i; simp at hi1; simp : i - 1 + 2 = i + 1)] at IH
+          exact IH
+      . unfold v_simp
+        rw [if_neg]; case hnc => linarith
+        rw [max_eq_left]
+        . simp; left; linarith
+        . simp_rw [cast_add]
+          have : v p (1 + (n + 1)) ≥ v p 1 + (n + 1 : ℕ) := by
+            apply iter_fast_growth_add _ 1 (n+2)
+            . intro i hi1 hi2 
+              have : i - 1 ≤ n := by nat_intervals
+              replace IH : _ := (IH (i - 1) this).1
+              rw [(by cases i; simp at hi1; simp : i - 1 + 1 = i)] at IH
+              rw [(by cases i; simp at hi1; simp : i - 1 + 2 = i + 1)] at IH
+              exact IH
+            . exact (le_refl _)
+            . linarith
+          simp [cast_add] at this
+          simp [this]
+          rw [(by linarith : 1 + (n + 1) = n + 2)] at this
+          rw [(by linarith : ↑n + 3 - 2 + p = p + (n + 1))]
+          exact this
+
+    constructor
+    . sorry
+    . sorry
+
+
 
 lemma theorem2_1 p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
   ∀ n ≥ 2, pointless p n :=
