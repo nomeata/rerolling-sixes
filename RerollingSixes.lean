@@ -544,10 +544,10 @@ lemma lemma1
             . exact (le_refl _)
             . linarith
           simp [cast_add] at this
-          simp [this]
+          rw [cast_ofNat]
           rw [(by linarith : 1 + (n + 1) = n + 2)] at this
           rw [(by linarith : ↑n + 3 - 2 + p = p + (n + 1))]
-          exact this
+          simp [this]
 
     constructor
     . sorry
