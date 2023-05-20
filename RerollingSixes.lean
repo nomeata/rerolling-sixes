@@ -549,11 +549,52 @@ lemma lemma1
           rw [(by linarith : ↑n + 3 - 2 + p = p + (n + 1))]
           simp [this]
 
+    specialize IH n (le_refl _)
+    cases' IH  with IH1 IH2
     constructor
-    . sorry
-    . sorry
-
-
+    case left =>
+      suffices : (1 - p) ^ (n + 3) ≤ p ^ (n + 3) * (↑n + 2 - v p (n + 2))
+      linarith
+      rw [ ← mul_inv_le_iff, ← div_eq_mul_inv, ← div_pow ]
+      linarith
+      cases hp1; positivity
+    case right =>
+      calc
+        v p (n + 2) + 1 + p ^ (n + 3) * (↑n + 2 - v p (n + 2)) - (1 - p) ^ (n + 3) 
+          = (1 - p^(n+3)) * v p (n + 2) + 1 + p ^ (n + 3) * (↑n + 2) - (1 - p) ^ (n + 3) := by
+          ring
+        _ < (1 - p^(n+3)) * (↑n + 2 - ((1 - p) / p) ^ (n + 3)) + 1 + p ^ (n + 3) * (↑n + 2) - (1 - p) ^ (n + 3) := by
+          -- congr_rel!
+          apply sub_lt_sub_right
+          apply add_lt_add_right
+          apply add_lt_add_right
+          apply mul_lt_mul_of_pos_left
+          . exact IH2
+          . apply lt_sub_right_of_add_lt
+            rw [zero_add]
+            apply pow_lt_one
+            . linarith
+            . exact hp2
+            . simp
+        _ = ↑n + 3 - ((1 - p) / p) ^ (n + 3) := by
+          simp_rw [mul_add, mul_sub, sub_mul, one_mul, ← mul_pow]
+          rw [mul_div_cancel']
+          ring
+          linarith
+        _ ≤ ↑n + 3 - ((1 - p) / p) ^ (n + 4) := by
+          -- congr_rel
+          apply sub_le_sub_left
+          rw [ _root_.pow_succ ]
+          apply mul_le_of_le_one_left
+          . apply pow_nonneg
+            apply div_nonneg
+            linarith
+            linarith
+          . rw [ div_le_iff ]
+            linarith
+            linarith
+        _ = ↑n + 3 - (1 - p) ^ (n + 4) / p ^ (n + 4) := by
+          rw [ div_pow ]
 
 lemma theorem2_1 p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
   ∀ n ≥ 2, pointless p n :=
@@ -561,5 +602,8 @@ lemma theorem2_1 p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
 
 lemma theorem2_2
   p (hp1 : phi_le p) (hp2 : p < 1) :
-  ∀ n ≥ 1, pointless p n :=
-  sorry
+  ∀ n ≥ 1, pointless p n := by
+  intros n hn
+  cases' n with n ; simp at hn
+  exact (lemma1 p hp1 hp2 n).1
+
