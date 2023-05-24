@@ -551,6 +551,7 @@ lemma lemma1
 
     specialize IH n (le_refl _)
     cases' IH  with IH1 IH2
+    clear IH1
     constructor
     case left =>
       suffices : (1 - p) ^ (n + 3) ≤ p ^ (n + 3) * (↑n + 2 - v p (n + 2))
@@ -606,4 +607,3 @@ lemma theorem2_2
   intros n hn
   cases' n with n ; simp at hn
   exact (lemma1 p hp1 hp2 n).1
-
