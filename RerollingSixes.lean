@@ -485,6 +485,7 @@ lemma v_eq_v_simp p (hp1 : 1/2 ≤ p) (hp2 : p < 1) n
       simp only [Nat.sub_sub_self h1n, pow_one]
       ring
 
+attribute [gcongr] sub_lt_sub_right add_lt_add_right mul_lt_mul_of_pos_left sub_le_sub_left
 
 lemma lemma1 
   p (hp1 : phi_le p) (hp2 : p < 1) :
@@ -565,26 +566,21 @@ lemma lemma1
           = (1 - p^(n+3)) * v p (n + 2) + 1 + p ^ (n + 3) * (↑n + 2) - (1 - p) ^ (n + 3) := by
           ring
         _ < (1 - p^(n+3)) * (↑n + 2 - ((1 - p) / p) ^ (n + 3)) + 1 + p ^ (n + 3) * (↑n + 2) - (1 - p) ^ (n + 3) := by
-          -- congr_rel!
-          apply sub_lt_sub_right
-          apply add_lt_add_right
-          apply add_lt_add_right
-          apply mul_lt_mul_of_pos_left
-          . exact IH2
+          gcongr
           . apply lt_sub_right_of_add_lt
             rw [zero_add]
             apply pow_lt_one
             . linarith
             . exact hp2
             . simp
+          . exact IH2
         _ = ↑n + 3 - ((1 - p) / p) ^ (n + 3) := by
           simp_rw [mul_add, mul_sub, sub_mul, one_mul, ← mul_pow]
           rw [mul_div_cancel']
           ring
           linarith
         _ ≤ ↑n + 3 - ((1 - p) / p) ^ (n + 4) := by
-          -- congr_rel
-          apply sub_le_sub_left
+          gcongr
           rw [ _root_.pow_succ ]
           apply mul_le_of_le_one_left
           . apply pow_nonneg
