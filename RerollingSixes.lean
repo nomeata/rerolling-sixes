@@ -3,7 +3,6 @@ import Mathlib.Tactic.GCongr
 
 import RerollingSixes.NatMemo
 import RerollingSixes.NatMemoAttr
-import RerollingSixes.FastChoose
 import RerollingSixes.NatSubElim
 
 set_option autoImplicit false
