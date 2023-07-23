@@ -1,5 +1,7 @@
 import Mathlib.Data.Nat.Choose.Multinomial
 import Mathlib.Tactic.GCongr
+import Mathlib.Order.LiminfLimsup
+import Mathlib.Data.Real.Basic
 
 import RerollingSixes.NatMemo
 import RerollingSixes.NatMemoAttr
@@ -394,7 +396,6 @@ lemma best_is_to_fix_just_one
       . intro j hj1 hj2
         apply hpointless _ hj1 hj2
       . rw [Nat.sub_sub, Nat.add_comm, <- Nat.sub_sub]
-        
         nat_intervals
         /-
         apply le_sub_of_add_le
@@ -489,6 +490,7 @@ lemma lemma1
   p (hp1 : phi_le p) (hp2 : p < 1) :
   ∀ n, v p (n+1) + 1 ≤ v p (n+2)
        ∧ v p (n+2) < (n+2) - ((1-p)/p)^(n+3) := by
+  stop -- Remove
   intro n
   rw [phi_le] at hp1
   have hp3 : 1 < 2 * p := by nlinarith
@@ -590,13 +592,38 @@ lemma lemma1
         _ = ↑n + 3 - (1 - p) ^ (n + 4) / p ^ (n + 4) := by
           rw [ div_pow ]
 
-lemma theorem2_1 p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
-  ∀ n ≥ 2, pointless p n :=
-  sorry
-
+-- We can conclude the second part of Theorem 2, where
+-- This is the second part where p > Φ
 lemma theorem2_2
   p (hp1 : phi_le p) (hp2 : p < 1) :
   ∀ n ≥ 1, pointless p n := by
   intros n hn
   cases' n with n ; simp at hn
   exact (lemma1 p hp1 hp2 n).1
+
+
+
+noncomputable def c p := ⨆ n, (v p (n + 2) - (n + 1) : ℝ)
+
+lemma cs_le_1 p (hp1 : phi_le p) (hp2 : p < 1) n :
+  v p (n + 2) - (n + 1) ≤ 1 := calc
+  v p (n + 2) - (n + 1)
+  ≤ ((n+2) - ((1-p)/p)^(n+3)) - (n + 1) := by gcongr; apply le_of_lt; exact (lemma1 p hp1 hp2 n).2
+  _ ≤ 1 - ((1-p)/p)^(n+3) := by linarith
+  _ ≤ 1 := by
+    simp only [div_pow, tsub_le_iff_right, le_add_iff_nonneg_right]
+    have := hp1.1
+    have : 0 ≤ 1 - p := by linarith
+    positivity
+
+lemma c_le_1 p (hp1 : phi_le p) (hp2 : p < 1) :
+  c p ≤ 1 := by
+  apply Real.iSup_le
+  case hS =>
+    intro n
+    have := cs_le_1 p hp1 hp2 n
+    sorry
+
+lemma theorem2_1 p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
+  ∀ n ≥ 2, pointless p n :=
+  sorry
