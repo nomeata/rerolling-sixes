@@ -4,5 +4,5 @@ import RerollingSixes.FindTheorems
 
 -- import Mathlib
 
-#find_theorems [ `HasSum ]
+#find_theorems [ `HasSum `tsum ]
 

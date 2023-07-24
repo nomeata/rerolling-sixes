@@ -10,7 +10,11 @@ syntax (name := find_theorems) "#find_theorems" " [" name+ "]" : command
 def findTheoremsElab : Elab.Command.CommandElab := λ stx => do
   match stx with
   | `(#find_theorems [ $snames:name* ]) =>
-    let needles := snames.map Lean.TSyntax.getName
+    let needles <- snames.mapM fun sname => do
+      let n := Lean.TSyntax.getName sname
+      unless ((← getEnv).contains n) do
+        throwErrorAt sname "Name {n} not in scope"
+      return n
     let hits := (← getEnv).constants.fold (init := []) fun es name ci =>
       let consts := Lean.Expr.getUsedConstants ci.type
       if needles.all fun needle => consts.elem needle
