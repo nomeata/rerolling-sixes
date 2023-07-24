@@ -4,7 +4,7 @@ set_option autoImplicit false
 
 open Lean
 
-syntax (name := find_theorems) "#find_theorems" " [" ident+ "]" : command
+syntax (name := find_theorems) "#find_theorems" "[" ident+ "]" : command
 
 @[command_elab find_theorems]
 def findTheoremsElab : Elab.Command.CommandElab := λ stx => do
@@ -27,4 +27,4 @@ def findTheoremsElab : Elab.Command.CommandElab := λ stx => do
   | _ =>
     Elab.throwUnsupportedSyntax
 
--- #find_theorems [ `find_theorems ]
+-- #find_theorems [ find_theorems ]
