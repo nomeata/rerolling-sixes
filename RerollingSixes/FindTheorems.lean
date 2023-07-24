@@ -17,7 +17,7 @@ def findTheoremsElab : Elab.Command.CommandElab := λ stx => do
       return n
     let hits := (← getEnv).constants.fold (init := []) fun es name ci =>
       let consts := Lean.Expr.getUsedConstants ci.type
-      if needles.all fun needle => consts.elem needle
+      if needles.all consts.elem
       then name :: es
       else es
     let hits_e <- hits.mapM mkConstWithLevelParams
