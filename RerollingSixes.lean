@@ -2,6 +2,10 @@ import Mathlib.Data.Nat.Choose.Multinomial
 import Mathlib.Tactic.GCongr
 import Mathlib.Order.LiminfLimsup
 import Mathlib.Data.Real.Basic
+import Mathlib.Topology.Basic
+import Mathlib.Topology.Algebra.Order.MonotoneConvergence
+import Mathlib.Topology.Instances.Real
+import Mathlib.Topology.Algebra.InfiniteSum.Basic
 
 import RerollingSixes.NatMemo
 import RerollingSixes.NatMemoAttr
@@ -11,8 +15,10 @@ set_option autoImplicit false
 
 open BigOperators Nat
 
+abbrev 𝕂 := ℝ
+
 /- Binomial Expectation operator -/
-def bc (p : ℚ) (n : ℕ) (i : ℕ) : ℚ :=
+def bc (p : 𝕂) (n : ℕ) (i : ℕ) : 𝕂 :=
   p^(i : ℕ) * (1-p)^(n - i) * n.choose i
 
 @[simp]
@@ -26,10 +32,10 @@ lemma bc_n p n : bc p n n = p^n := by simp [bc]
 
   
     
-def En (p : ℚ) (n : ℕ) (val : ∀ i, i ≤ n -> ℚ) : ℚ :=
+def En (p : 𝕂) (n : ℕ) (val : ∀ i, i ≤ n -> 𝕂) : 𝕂 :=
   ∑ j : Fin (n+1), bc p n j * val j (le_of_lt_succ j.2)
 
-def v (p : ℚ) (n : ℕ) : ℚ :=
+def v (p : 𝕂) (n : ℕ) : 𝕂 :=
   if hnz : n = 0 then 0
   else En p n (fun i hi =>
     if hz : i = 0
@@ -44,7 +50,7 @@ def v (p : ℚ) (n : ℕ) : ℚ :=
   )
 decreasing_by decreasing_with aesop (add safe Nat.sub_lt, safe Nat.zero_lt_of_ne_zero)
 
-def vf (p : ℚ) (n : ℕ) (r : ∀ i, i < n -> ℚ) : ℚ :=
+def vf (p : 𝕂) (n : ℕ) (r : ∀ i, i < n -> 𝕂) : 𝕂 :=
   if hnz : n = 0 then 0
   else En p n (fun i hi =>
     if hz : i = 0
@@ -59,7 +65,7 @@ def vf (p : ℚ) (n : ℕ) (r : ∀ i, i < n -> ℚ) : ℚ :=
   )  
 
 -- Cannot use attr yet, due to extra parameters
-def fast_v (p : ℚ) (n : ℕ)  : ℚ := NatMemo.memo (vf p) n
+def fast_v (p : 𝕂) (n : ℕ)  : 𝕂 := NatMemo.memo (vf p) n
 
 @[csimp]
 lemma v_fast_v : v = fast_v := by
@@ -75,7 +81,7 @@ lemma v_fast_v : v = fast_v := by
 /--
 Show that En is normalized
 -/
-lemma En_const (p n) (q : ℚ) :
+lemma En_const (p n) (q : 𝕂) :
   En p n (fun _ _ => q) = q := by
   rw [En]
   rw [<- Finset.sum_mul]
@@ -95,8 +101,8 @@ lemma En_const (p n) (q : ℚ) :
     case inr h => contradiction
 
 lemma En_mono {p} (hp : 0 ≤ p) (hp2 : p ≤ 1) (n)
-  (val1 : ∀ i, i ≤ n -> ℚ)
-  (val2 : ∀ i, i ≤ n -> ℚ)
+  (val1 : ∀ i, i ≤ n -> 𝕂)
+  (val2 : ∀ i, i ≤ n -> 𝕂)
   (val_nonneg : ∀ i (hin : i ≤ n), val1 i hin <= val2 i hin) :
   En p n val1 ≤ En p n val2 := by
   have : 0 ≤ (1 - p) := by linarith
@@ -122,7 +128,7 @@ lemma le_En {p} (hp : 0 ≤ p) (hp2 : p ≤ 1) n val q
     _ ≤ En p n val := En_mono hp hp2 _ _ _ hval
     
 lemma En_nonneg {p} (hp : 0 ≤ p) (hp2 : p ≤ 1) (n)
-  (val : ∀ i, i ≤ n -> ℚ)
+  (val : ∀ i, i ≤ n -> 𝕂)
   (val_nonneg : ∀ i (hin : i ≤ n), 0 ≤ val i hin) :
   0 ≤ En p n val := le_En hp hp2 n val 0 val_nonneg 
 
@@ -209,14 +215,14 @@ lemma v_2 p (hp2 : p ≤ 1) : v p 2 = 3*p - p^3 := by
   ring
 
 -- (√5 - 1)/2 ≤ p
-def phi_le (p : ℚ) := 0 < p ∧ 5 ≤ (2*p + 1)^2
+def phi_le (p : 𝕂) := 0 < p ∧ 5 ≤ (2*p + 1)^2
 
 /- A predicate that it’s not useful to continue with n coins,
 when one can continue with n+1 coins -/
-def pointless (p : ℚ) n := v p n + 1 ≤ v p (n + 1)
+def pointless (p : 𝕂) n := v p n + 1 ≤ v p (n + 1)
 
 def iter_fast_growth_add
-  (f : ℕ → ℚ) n₀ n
+  (f : ℕ → 𝕂) n₀ n
   (hf : ∀ i ≥ n₀, i < n → f i + 1 ≤ f (i + 1)) :
   ∀ i j, n₀ ≤ i → i + j ≤ n → f i + j ≤ f (i + j) := by
   intros i j hi hj
@@ -234,7 +240,7 @@ def iter_fast_growth_add
       . linarith
 
 def iter_fast_growth_sub
-  (f : ℕ → ℚ) n₀ n (hn0n : n₀ ≤ n)
+  (f : ℕ → 𝕂) n₀ n (hn0n : n₀ ≤ n)
   (hf : ∀ i ≥ n₀, i < n → f i + 1 ≤ f (i + 1)) :
   ∀ j ≤ n - n₀, j + f (n - j) ≤ f n := by
   intros j hj
@@ -253,7 +259,7 @@ def iter_fast_growth_sub
       apply Nat.le_trans hj
       apply Nat.sub_le
 
-lemma En_upd p n f i (hi : i ≤ n) (q : ℚ)
+lemma En_upd p n f i (hi : i ≤ n) (q : 𝕂)
   : En p n f = En p n (fun j hj => if j = i then q else f j hj)
               + bc p n i * (f i hi - q) := by
   rw [En, En]
@@ -428,7 +434,7 @@ lemma almost_all_heads_is_great
     rfl
   . simp; ring
 
-def v_simp p n :=
+noncomputable def v_simp p n :=
   if n ≤ 2 then v p n
   else 
   v p (n-1) + 1 +
@@ -601,14 +607,14 @@ lemma theorem2_2
   cases' n with n ; simp at hn
   exact (lemma1 p hp1 hp2 n).1
 
+def cs p n :=v p (n + 2) - (n + 1) 
 
+noncomputable def c p := ⨆ n, cs p n
 
-noncomputable def c p := ⨆ n, (v p (n + 2) - (n + 1) : ℝ)
-
-lemma cs_le_1 p (hp1 : phi_le p) (hp2 : p < 1) n :
-  v p (n + 2) - (n + 1) ≤ 1 := calc
+lemma cs_le_1 p (hp1 : phi_le p) (hp2 : p < 1) n : cs p n ≤ 1 := calc
   v p (n + 2) - (n + 1)
-  ≤ ((n+2) - ((1-p)/p)^(n+3)) - (n + 1) := by gcongr; apply le_of_lt; exact (lemma1 p hp1 hp2 n).2
+  ≤ ((n+2) - ((1-p)/p)^(n+3)) - (n + 1) := by
+    gcongr; apply le_of_lt; exact (lemma1 p hp1 hp2 n).2
   _ ≤ 1 - ((1-p)/p)^(n+3) := by linarith
   _ ≤ 1 := by
     simp only [div_pow, tsub_le_iff_right, le_add_iff_nonneg_right]
@@ -616,13 +622,39 @@ lemma cs_le_1 p (hp1 : phi_le p) (hp2 : p < 1) n :
     have : 0 ≤ 1 - p := by linarith
     positivity
 
-lemma c_le_1 p (hp1 : phi_le p) (hp2 : p < 1) :
-  c p ≤ 1 := by
+lemma c_le_1 p (hp1 : phi_le p) (hp2 : p < 1) : c p ≤ 1 := by
   apply Real.iSup_le
-  case hS =>
-    intro n
-    have := cs_le_1 p hp1 hp2 n
-    sorry
+  case hS => intro n; exact cs_le_1 p hp1 hp2 n
+  case ha => exact zero_le_one
+
+lemma cs_mono p (hp1 : phi_le p) (hp2 : p < 1) : Monotone (cs p) := by
+  apply monotone_nat_of_le_succ
+  intro n
+  calc v p (n + 2) - (n + 1)
+      ≤ (v p (n + 2) + 1) - (n + 2) := by linarith
+    _ ≤ v p (n + 3) - (n + 2) := by
+      gcongr; exact theorem2_2 p hp1 hp2 (n + 2) (by linarith)
+    _ = v p (succ n + 2) - (succ n + 1) := by norm_num; linarith
+
+lemma cs_bounded p (hp1 : phi_le p) (hp2 : p < 1) : BddAbove (Set.range (cs p)) := by
+  rewrite [ bddAbove_iff_exists_ge 1 ]
+  refine ⟨1, ?_ ⟩
+  constructor
+  . rfl
+  . rintro y ⟨n, rfl⟩
+    exact cs_le_1 p hp1 hp2 n
+
+lemma c_is_limit p (hp1 : phi_le p) (hp2 : p < 1) :
+  Filter.Tendsto (cs p) Filter.atTop (nhds (c p)) :=
+  tendsto_atTop_ciSup (cs_mono p hp1 hp2) (cs_bounded p hp1 hp2)
+
+lemma lemma4 (p : ℝ) (hp1 : 0 ≤ p) (hp2 : p < 1) (n : ℕ) :
+  (∑' i, (n + 1 + i : ℕ) * p ^ (n + 1 + i))
+  = p^(n+1)*(n / (1 - p ) + 1/(1-p^2)) := by
+  apply HasSum.tsum_eq
+  sorry
+    
+
 
 lemma theorem2_1 p (hp1 : 0.5 ≤ p) (hp2 : p < 1) :
   ∀ n ≥ 2, pointless p n :=
