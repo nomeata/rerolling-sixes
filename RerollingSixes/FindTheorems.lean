@@ -57,6 +57,8 @@ def NameSet.intersects (ss : Array NameSet) : NameSet :=
 def NameSet.union (s₁ : NameSet) (s₂ : NameSet) : NameSet :=
   s₂.fold (init := s₁) .insert
 
+private def maxShown := 200
+
 syntax (name := find_theorems) withPosition("#find_theorems" (colGt ident)+) : command
 
 @[command_elab find_theorems]
@@ -82,8 +84,9 @@ def findTheoremsElab : Elab.Command.CommandElab := λ stx => do
       let hits := hits.toArray.qsort Name.lt
       let hits_e <- hits.mapM mkConstWithLevelParams
       Lean.logInfo $
-        m!"Found {hits_e.size} constants:" ++ Format.line ++
-        (MessageData.joinSep (hits_e.toList.map ppConst) Format.line)
+        m!"Found {hits_e.size} definitions mentioning {needles}" ++
+        (if hits_e.size > maxShown then m!" (only {maxShown} shown)" else "") ++ ":" ++ Format.line ++
+        (MessageData.joinSep ((hits_e.toList.take maxShown).map ppConst) Format.line)
     | _ =>
       Elab.throwUnsupportedSyntax
 
