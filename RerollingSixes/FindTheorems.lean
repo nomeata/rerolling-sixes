@@ -1,5 +1,6 @@
 import Lean
 import Std.Lean.Delaborator
+import Mathlib.Lean.Expr.Basic
 
 set_option autoImplicit false
 
@@ -17,6 +18,8 @@ def findTheoremsElab : Elab.Command.CommandElab := λ stx => do
         throwErrorAt sident "Name {n} not in scope"
       return n
     let hits := (← getEnv).constants.fold (init := []) fun es name ci =>
+      if name.isInternal' then es
+      else
       let consts := Lean.Expr.getUsedConstants ci.type
       if needles.all consts.elem
       then name :: es
