@@ -2,6 +2,8 @@ import Mathlib.Topology.Algebra.InfiniteSum.Basic
 
 import RerollingSixes.FindTheorems
 
--- import Mathlib
+import Mathlib
 
-#find_theorems [ HasSum tsum ]
+set_option profiler true
+
+#find_theorems [ HasSum ]
