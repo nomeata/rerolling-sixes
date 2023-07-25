@@ -1,4 +1,5 @@
 import Lean
+import Std.Lean.Delaborator
 
 set_option autoImplicit false
 
@@ -23,7 +24,7 @@ def findTheoremsElab : Elab.Command.CommandElab := λ stx => do
     let hits_e <- hits.mapM mkConstWithLevelParams
     Lean.logInfo $
       m!"Found {hits.length} constants:" ++ Format.line ++
-      (MessageData.joinSep (hits_e.map .ofExpr) Format.line)
+      (MessageData.joinSep (hits_e.map ppConst) Format.line)
   | _ =>
     Elab.throwUnsupportedSyntax
 
