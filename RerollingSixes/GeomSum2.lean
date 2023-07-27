@@ -58,4 +58,28 @@ lemma tsum_n_mul_pow_n {r : ℝ} (h₁ : 0 ≤ r) (h₂ : r < 1) :
     _ = r * (1/(1-r))^2 := by congr; exact inv_eq_one_div (1 - r)
     _ = _ := by rw [div_pow, @mul_div, one_pow, mul_one]
 
-    
+lemma hasSum_n_mul_pow_n {r : ℝ} (h₁ : 0 ≤ r) (h₂ : r < 1) :
+  HasSum (fun (n : ℕ) => n * r ^ n) (r / (1 - r)^2) := by
+  rw [(summable_n_mul_pow_n h₁ h₂).hasSum_iff] 
+  apply tsum_n_mul_pow_n h₁ h₂
+
+syntax (name := equals) "equals" term "by" tacticSeq: conv
+macro_rules
+  | `(conv|equals $rhs:term by $t:tacticSeq) => `(conv|tactic => show (_ = $rhs); . $t )
+
+lemma lemma4 {n : ℕ} {r : ℝ} (h₁ : 0 ≤ r) (h₂ : r < 1) :
+  HasSum (fun (k : ℕ) => (k + (n + 1)) * r ^ (k + (n+1))) 
+         (r^(n+1) * (n / (1-r) + 1 / (1 - r)^2)) := by
+  have h₃ : 1 - r > 0 := by exact Iff.mpr sub_pos h₂
+  have expand : 1 / (1 - r) = (1 - r) / (1-r)^2 := by
+    rw [pow_two, div_mul_eq_div_div, div_self]; positivity
+  conv => left; ext k; equals r ^ (n+1) * ((↑n + 1) * r^k + k * r ^ k) by 
+    ring
+  conv => right; equals r ^ (n+1) * ((↑n+1) * (1/(1 - r)) + r / (1 - r) ^ 2) by
+    rw [ mul_div, mul_one, add_div, expand ]; ring
+  apply HasSum.mul_left
+  apply HasSum.add
+  . apply HasSum.mul_left
+    rw [one_div]
+    apply hasSum_geometric_of_lt_1 h₁ h₂
+  . apply hasSum_n_mul_pow_n h₁ h₂
