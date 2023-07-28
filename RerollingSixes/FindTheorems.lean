@@ -90,9 +90,9 @@ initialize findDeclsByConsts : DeclCache (NameRel × NameRel) ←
 -- Faster implementations possible?
 def NameSet.intersects (ss : Array NameSet) : NameSet :=
   -- sort shortest set to the back
-  let ss := ss.qsort (fun s1 s2 => s1.size > s2.size)
+  let ss := ss.qsort (·.size > ·.size)
   ss.back.fold (init := {}) fun s m =>
-    if ss.pop.all (fun s' => s'.contains m) then s.insert m else s
+    if ss.pop.all (·.contains m) then s.insert m else s
   
 def NameSet.union (s₁ : NameSet) (s₂ : NameSet) : NameSet :=
   s₂.fold (init := s₁) .insert
@@ -146,7 +146,7 @@ def findTheoremsElab : CommandElab := λ stx => liftTermElabM $ do
     let hits2 <- hits.filterM fun n => do
       let env <- getEnv
       if let some ci := env.find? n then do
-        pats.allM fun pat => Mathlib.Tactic.Find.matchPat pat ci
+        pats.allM (Mathlib.Tactic.Find.matchPat · ci)
       else return false
 
     let hits2_e <- hits2.mapM mkConstWithLevelParams
