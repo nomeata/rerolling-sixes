@@ -138,21 +138,30 @@ def findTheoremsElab : CommandElab := λ stx => liftTermElabM $ do
     let needles : NameSet :=
           {} |> idents.foldl NameSet.insert
              |> terms.foldl (fun s t => t.foldConsts s (flip NameSet.insert))
+    if needles.isEmpty
+    then do
+      Lean.logWarningAt stx[1] m!"Cannot search: No constants in search pattern."
+    else do
+      let (m₁, m₂) <- findDeclsByConsts.get
+      let hits := NameSet.intersects $ needles.toArray.map $ fun needle =>
+        NameSet.union (m₁.findD needle {}) (m₂.findD needle {})
+      let hits := hits.toArray.qsort Name.lt
+      let hits2 <- hits.filterM fun n => do
+        let env <- getEnv
+        if let some ci := env.find? n then do
+          pats.allM (Mathlib.Tactic.Find.matchPat · ci)
+        else return false
+      
+      let msg_header : MessageData :=
+        if pats.isEmpty
+        then m!"Found {hits.size} definitions mentioning all of {needles.toArray}" ++
+          (if hits2.size > maxShown then m!" (first {maxShown} shown):" else ":") ++ Format.line
+        else m!"Found {hits.size} definitions mentioning all of {needles.toArray}" ++ Format.line ++
+          m!"of which {hits2.size} match the given pattern" ++
+          (if hits2.size > maxShown then m!" (first {maxShown} shown):" else ":") ++ Format.line
 
-    let (m₁, m₂) <- findDeclsByConsts.get
-    let hits := NameSet.intersects $ needles.toArray.map $ fun needle =>
-      NameSet.union (m₁.findD needle {}) (m₂.findD needle {})
-    let hits := hits.toArray.qsort Name.lt
-    let hits2 <- hits.filterM fun n => do
-      let env <- getEnv
-      if let some ci := env.find? n then do
-        pats.allM (Mathlib.Tactic.Find.matchPat · ci)
-      else return false
-
-    let hits2_e <- hits2.mapM mkConstWithLevelParams
-    Lean.logInfo $
-      m!"Found {hits2.size} definitions mentioning all of {needles.toArray}" ++
-      (if hits2_e.size > maxShown then m!" (only {maxShown} shown)" else "") ++ ":" ++ Format.line ++
-      (MessageData.joinSep ((hits2_e.toList.take maxShown).map ppConst) Format.line)
+      let hits2_e <- hits2.mapM mkConstWithLevelParams
+      Lean.logInfo $ msg_header ++
+        (MessageData.joinSep ((hits2_e.toList.take maxShown).map ppConst) Format.line)
 
 -- #find_theorems (id id) id (_ + _)
