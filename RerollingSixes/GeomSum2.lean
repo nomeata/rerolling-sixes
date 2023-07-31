@@ -24,13 +24,10 @@ macro_rules
 lemma lemma4 {n : ℕ} {r : ℝ} (h₁ : 0 ≤ r) (h₂ : r < 1) :
   HasSum (fun (k : ℕ) => (k + (n + 1)) * r ^ (k + (n+1))) 
          (r^(n+1) * (n / (1-r) + 1 / (1 - r)^2)) := by
-  have h₃ : 1 - r > 0 := by exact Iff.mpr sub_pos h₂
-  have expand : 1 / (1 - r) = (1 - r) / (1-r)^2 := by
-    rw [pow_two, div_mul_eq_div_div, div_self]; positivity
-  cchange left ; ext k with r ^ (n+1) * ((↑n + 1) * r^k + k * r ^ k) by
-    ring
+  have h₃' : 1 - r ≠ 0 := (Iff.mpr sub_pos h₂).ne'
+  cchange left ; ext k with r ^ (n+1) * ((↑n + 1) * r^k + k * r ^ k) by ring
   conv => right; equals r ^ (n+1) * ((↑n+1) * (1/(1 - r)) + r / (1 - r) ^ 2) by
-    rw [ mul_div, mul_one, add_div, expand ]; ring
+    field_simp; left; ring
   apply HasSum.mul_left
   apply HasSum.add
   . apply HasSum.mul_left
