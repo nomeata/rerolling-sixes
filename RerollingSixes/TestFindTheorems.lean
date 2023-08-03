@@ -1,18 +1,32 @@
-import Mathlib.Topology.Algebra.InfiniteSum.Basic
-import Mathlib.Analysis.SpecificLimits.Normed
-
 import RerollingSixes.FindTheorems
 
-import Mathlib
+import Mathlib.Topology.Algebra.InfiniteSum.Basic
+import Mathlib.Analysis.SpecificLimits.Normed
+-- import Mathlib
+
+set_option autoImplicit false
+
 
 set_option profiler true
 set_option profiler.threshold 100
 
--- #find (tsum _ * tsum _ = _)
+def foo : Bool := true
+
+theorem foo_eq_foo_eq_foo_eq_foo : (foo = foo) = (foo = foo) := refl _
+
+#find_theorems foo
+
+set_option pp.rawOnError true
+-- #find_theorems  HMul.hMul HAdd.hAdd "Nat.left_distr"
+-- #find_theorems (_ * (_ + _)) "distr"
+#find_theorems (tsum _ = _) (_ * _ ^ _)
+#find_theorems ⊢ (tsum _ = _) (_ * _ ^ _)
 
 -- #find_theorems Eq
 
-#find_theorems (Lean.Syntax → Lean.Name)
-#find (Lean.Syntax → Lean.Name)
+-- #find_theorems (Lean.Syntax → Lean.Name)
+-- #find (Lean.Syntax → Lean.Name)
 
-#find_theorems (∑' _, _ = _) HMul.hMul HPow.hPow
+-- #find_theorems (∑' _, _ = _) HMul.hMul HPow.hPow
+
+-- #find_theorems id (_ = _)
