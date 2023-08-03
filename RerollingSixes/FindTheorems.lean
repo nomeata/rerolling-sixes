@@ -114,15 +114,17 @@ def NameSet.union (s₁ : NameSet) (s₂ : NameSet) : NameSet :=
 
 open Lean.Parser
 
--- def ident_or_term := leading_parser
---   ident <|> termParser
--- syntax (name := ident_or_term)
---   ident <|> termParser : ident_or_term
 
-syntax conclusion_pattern := ("⊢ " <|> "|- ") term:max
+syntax name_pattern := strLit
+syntax ident_pattern := ident
+syntax turnstyle := "⊢ " <|> "|- "
+syntax conclusion_pattern := turnstyle term:max
+syntax term_pattern := term:max
+syntax find_pattern := name_pattern <|> ident_pattern <|> conclusion_pattern <|> term_pattern
+syntax (name := find_theorems) withPosition("#find_theorems" (colGt find_pattern)+) : command
 
-syntax (name := find_theorems)
-  withPosition("#find_theorems" (colGt (strLit <|> ident <|> conclusion_pattern <|> term:max))+) : command
+-- syntax (name := find_theorems)
+  -- withPosition("#find_theorems" (colGt (strLit <|> ident <|> conclusion_pattern <|> term:max))+) : command
 
 open Lean.Meta
 open Lean.Elab
@@ -159,33 +161,34 @@ def listOfConsts {m} [Monad m] [MonadEnv m] [MonadError m]
     let es <- names.mapM mkConstWithLevelParams
     pure (MessageData.bulletList (es.map ppConst))
 
-
 @[command_elab find_theorems]
-def findTheoremsElab : CommandElab := λ stx => liftTermElabM $ do
+def findTheoremsElab : CommandElab := λ stx => liftTermElabM do
   profileitM Exception "find_theorems" (← getOptions) do
     -- Parse the filters into the various categories
     let mut idents := #[]
     let mut name_pats := #[]
     let mut terms := #[]
-    for arg in stx[1].getArgs do
-      match arg with
-      | `($ss:str) => do
-        let str := Lean.TSyntax.getString ss
-        name_pats := name_pats.push str
-      | `($i:ident) => do
-        let n := Lean.TSyntax.getId i
-        unless (← getEnv).contains n do
-          throwErrorAt i "Name {n} not in scope"
-        idents := idents.push n
-      | _ => do
-        if arg.getKind == ``conclusion_pattern
-        then
-          let t ← Lean.Elab.Term.elabTerm arg[1] none
+    match stx with
+      | `(command| #find_theorems $args:find_pattern*) =>
+      for arg in args do
+        match arg with
+        | `(find_pattern| $ss:str) => do
+          let str := Lean.TSyntax.getString ss
+          name_pats := name_pats.push str
+        | `(find_pattern| $i:ident) => do
+          let n := Lean.TSyntax.getId i
+          unless (← getEnv).contains n do
+            throwErrorAt i "unknown identifier '{n}'"
+          idents := idents.push n
+        | `(find_pattern| $_:turnstyle $s:term) => do
+          let t ← Lean.Elab.Term.elabTerm s none
           terms := terms.push (true, t)
-        else
-          let t ← Lean.Elab.Term.elabTerm arg none
+        | `(find_pattern| $s:term) => do
+          let t ← Lean.Elab.Term.elabTerm s none
           terms := terms.push (false, t)
-
+        | _ => throwErrorAt arg "unexpected argument to #find"
+      | _ => throwErrorAt stx "unexpected #find command"
+    
     let needles : NameSet :=
           {} |> idents.foldl NameSet.insert
              |> terms.foldl (fun s (_,t) => t.foldConsts s (flip NameSet.insert))
