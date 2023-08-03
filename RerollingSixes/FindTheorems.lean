@@ -19,19 +19,16 @@ namespace Mathlib.Tactic.Find
 open Lean.Meta
 open Lean.Elab
 
-structure PreparedPattern extends  AbstractMVarsResult where
-  headIndex : HeadIndex
+def PreparedPattern := ConstantInfo → MetaM Bool
 
-def preparePat (t : Expr) : MetaM PreparedPattern := do
-  let amr <- withReducible $ do abstractMVars (← instantiateMVars t)
-  pure { toAbstractMVarsResult := amr, headIndex := t.toHeadIndex }
-
-def matchPatAnywhere (pat : PreparedPattern) (c : ConstantInfo) : MetaM Bool := do
-  let found  ← IO.mkRef false
-  withReducible do
+def matchAnywhere (t : Expr) : MetaM PreparedPattern := withReducible do
+  let head := t.toHeadIndex
+  let pat <- abstractMVars (← instantiateMVars t)
+  pure fun (c : ConstantInfo) => withReducible do
+    let found  ← IO.mkRef false
     let cTy := c.instantiateTypeLevelParams (← mkFreshLevelMVars c.numLevelParams)
     Lean.Meta.forEachExpr' cTy fun sub_e => do
-      if pat.headIndex == sub_e.toHeadIndex then do
+      if head == sub_e.toHeadIndex then do
         withNewMCtxDepth $ do
           let pat := pat.expr.instantiateLevelParamsArray pat.paramNames
             (← mkFreshLevelMVars pat.numMVars).toArray
@@ -41,7 +38,7 @@ def matchPatAnywhere (pat : PreparedPattern) (c : ConstantInfo) : MetaM Bool := 
           then found.set true
       -- keep searching if we haven't found it yet
       not <$> found.get 
-  found.get
+    found.get
 
 
 private partial def matchHyps : List Expr → List Expr → List Expr → MetaM Bool
@@ -55,11 +52,13 @@ private partial def matchHyps : List Expr → List Expr → List Expr → MetaM 
   | [], _, _    => pure true
   | _::_, _, [] => pure false
 
-def matchPatConclusion (pat : PreparedPattern) (c : ConstantInfo) : MetaM Bool :=
-  withReducible do
+def matchConclusion (t : Expr) : MetaM PreparedPattern := withReducible do
+  let head := (← forallMetaTelescopeReducing t).2.2.toHeadIndex
+  let pat <- abstractMVars (← instantiateMVars t)
+  pure fun (c : ConstantInfo) => withReducible do
     let cTy := c.instantiateTypeLevelParams (← mkFreshLevelMVars c.numLevelParams)
     forallTelescopeReducing cTy fun cParams cTy' ↦ do
-      if pat.headIndex == cTy'.toHeadIndex then
+      if head == cTy'.toHeadIndex then
         let pat := pat.expr.instantiateLevelParamsArray pat.paramNames
           (← mkFreshLevelMVars pat.numMVars).toArray
         let (_, _, pat) ← lambdaMetaTelescope pat
@@ -120,24 +119,15 @@ open Lean.Parser
 -- syntax (name := ident_or_term)
 --   ident <|> termParser : ident_or_term
 
+syntax conclusion_pattern := ("⊢ " <|> "|- ") term:max
 
 syntax (name := find_theorems)
-  withPosition("#find_theorems" (colGt (strLit <|> ident <|> ("⊢ " term:max) <|> term:max))+) : command
+  withPosition("#find_theorems" (colGt (strLit <|> ident <|> conclusion_pattern <|> term:max))+) : command
 
 open Lean.Meta
 open Lean.Elab
 open Lean.Elab.Command
 
-def Array.mapOrM {m α β γ} [Monad m]
-  (as : Array α) (f : α -> m (β ⊕ γ)) : m (Array β × Array γ) := do
-  let mut bs := #[]
-  let mut cs := #[]
-  for a in as do
-    match ← f a with
-    | .inl b => bs := bs.push b
-    | .inr c => cs := cs.push c
-  return (bs, cs)
-  
 private def maxShown := 200
 
 -- until https://github.com/leanprover/std4/pull/178 lands
@@ -177,8 +167,8 @@ def findTheoremsElab : CommandElab := λ stx => liftTermElabM $ do
     let mut idents := #[]
     let mut name_pats := #[]
     let mut terms := #[]
-    for s in stx[1].getArgs do
-      match s with
+    for arg in stx[1].getArgs do
+      match arg with
       | `($ss:str) => do
         let str := Lean.TSyntax.getString ss
         name_pats := name_pats.push str
@@ -187,18 +177,14 @@ def findTheoremsElab : CommandElab := λ stx => liftTermElabM $ do
         unless (← getEnv).contains n do
           throwErrorAt i "Name {n} not in scope"
         idents := idents.push n
-      | `(group "⊢" $st:term) => do
-        let t ← Lean.Elab.Term.elabTerm st none
-        terms := terms.push (true, t)
       | _ => do
-        let t ← Lean.Elab.Term.elabTerm s none
-        terms := terms.push (false, t)
-
-    let pats <- liftM $ terms.mapM fun (conclusion, t) => do
-      let pat ← Find.preparePat t
-      if conclusion
-      then pure (Mathlib.Tactic.Find.matchPatConclusion pat)
-      else pure (Mathlib.Tactic.Find.matchPatAnywhere pat)
+        if arg.getKind == ``conclusion_pattern
+        then
+          let t ← Lean.Elab.Term.elabTerm arg[1] none
+          terms := terms.push (true, t)
+        else
+          let t ← Lean.Elab.Term.elabTerm arg none
+          terms := terms.push (false, t)
 
     let needles : NameSet :=
           {} |> idents.foldl NameSet.insert
@@ -206,37 +192,44 @@ def findTheoremsElab : CommandElab := λ stx => liftTermElabM $ do
     if needles.isEmpty
     then do
       Lean.logWarningAt stx[1] m!"Cannot search: No constants in search pattern."
-    else do
-      let (m₁, m₂) <- findDeclsByConsts.get
-      let hits := NameSet.intersects $ needles.toArray.map $ fun needle =>
-        NameSet.union (m₁.findD needle {}) (m₂.findD needle {})
+      return
+    
 
-      -- Filter by name
-      let hits2 := hits.toArray.filter fun n => name_pats.all fun p =>
-        p.isInfixOf n.toString
+    let pats <- liftM $ terms.mapM fun (conclusion, t) =>
+      if conclusion
+      then Mathlib.Tactic.Find.matchConclusion t
+      else Mathlib.Tactic.Find.matchAnywhere t
 
-      let hits3 <- hits2.filterM fun n => do
-        let env <- getEnv
-        if let some ci := env.find? n then do pats.allM (· ci)
-        else return false
+    let (m₁, m₂) <- findDeclsByConsts.get
+    let hits := NameSet.intersects $ needles.toArray.map $ fun needle =>
+      NameSet.union (m₁.findD needle {}) (m₂.findD needle {})
 
-      let hits4 := hits3.qsort Name.lt
-      
-      let summary ← IO.mkRef MessageData.nil
-      let add_line line := do summary.set $ (← summary.get) ++ line ++ Format.line
+    -- Filter by name
+    let hits2 := hits.toArray.filter fun n => name_pats.all fun p =>
+      p.isInfixOf n.toString
+
+    let hits3 <- hits2.filterM fun n => do
+      let env <- getEnv
+      if let some ci := env.find? n then do pats.allM (· ci)
+      else return false
+
+    let hits4 := hits3.qsort Name.lt
+    
+    let summary ← IO.mkRef MessageData.nil
+    let add_line line := do summary.set $ (← summary.get) ++ line ++ Format.line
 
 
-      let needles_list := MessageData.andList (needles.toArray.map .ofName)
-      add_line $ m!"Found {hits.size} definitions mentioning {needles_list}."
-      unless (name_pats.isEmpty) do
-        let name_list := MessageData.andList <| name_pats.map fun s => m!"\"{s}\""
-        add_line $ m!"Of these, {hits2.size} have a name containing {name_list}."
-      unless (pats.isEmpty) do
-        add_line $ m!"Of these, {hits3.size} have mention your pattern(s)."
-      unless (hits4.size ≤ maxShown) do
-        add_line $ m!"Of these, the first {maxShown} are shown."
+    let needles_list := MessageData.andList (needles.toArray.map .ofName)
+    add_line $ m!"Found {hits.size} definitions mentioning {needles_list}."
+    unless (name_pats.isEmpty) do
+      let name_list := MessageData.andList <| name_pats.map fun s => m!"\"{s}\""
+      add_line $ m!"Of these, {hits2.size} have a name containing {name_list}."
+    unless (pats.isEmpty) do
+      add_line $ m!"Of these, {hits3.size} match your patterns."
+    unless (hits4.size ≤ maxShown) do
+      add_line $ m!"Of these, the first {maxShown} are shown."
 
-      Lean.logInfo $ (← summary.get) ++ (← listOfConsts (hits4.toList.take maxShown))
+    Lean.logInfo $ (← summary.get) ++ (← listOfConsts (hits4.toList.take maxShown))
 
 -- #find_theorems "foo"
 -- #find_theorems (id id) id (_ + _)
