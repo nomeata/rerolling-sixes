@@ -1,0 +1,50 @@
+\documentclass[DIV=14]{scrartcl}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsthm}
+\usepackage{conteq}
+
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\begin{document}
+\title{Monotonicity of the expected value of a binominal experiment}
+\author{Joachim Breitner}
+\enlargethispage{5cm}
+
+\maketitle
+
+\begin{definition}
+Let
+\[
+E_{n,p}(f)
+= \sum_{i + j = n} p^i (1-p)^j \binom n i f(i)
+\]
+be the expected value of $f(X)$ where $X$ is binominally distributed.
+\end{definition}
+
+\begin{theorem}
+Let $f(i) \le f(j)$ for all $i \le j$. Then $E_{n,p}(f) \le E_{n,q}$ for $p \le q$.
+\end{theorem}
+
+\begin{proof}
+\begin{conteq}
+E_{n,p}(f) \\
+= \sum_{i + j = n} p^i (1-p)^j \binom n i f(i) \\
+= \sum_{i + j = n} p^i (1-p)^j \binom n i f(i)
+   \underbrace{\sum_{k + l = j} \left(\frac{q-p}{1-p}\right)^k \left(1-\frac{q-p}{1-p}\right)^l \binom j k}_{= 1} \\
+= \sum_{i +  k + l = n} p^i (1-p)^{k + l} \binom n i f(i)
+   \left(\frac{q-p}{1-p}\right)^k \left(1-\frac{q-p}{1-p}\right)^l \binom j k \\
+= \sum_{i +  k + l = n} p^i (q-p)^k (1-q)^l  \binom n i \binom j k f(i) \\
+= \sum_{i +  k + l = n} p^i (q-p)^k (1-q)^l \frac{n!}{i!j!k!} k f(i) \\
+\le \sum_{i +  k + l = n} p^i (q-p)^k (1-q)^l  \frac{n!}{i!j!k!}  f(i+k) \\
+= \sum_{i +  k + l = n} \left(\frac{p}{q}\right)^i \left(1 - \frac{p}{q}\right)^k q^{i+k} (1-q)^l  \binom{n}{i+k} \binom{i+k}{i} f(i+k) \\
+= \sum_{m + l = n} \underbrace{\sum_{i + k = m} \left(\frac{p}{q}\right)^i \left(1 - \frac{p}{q}\right)^k \binom{m}{i}}_{=1} q^{m} (1-q)^l  \binom{n}{m}  f(i+k) \\
+= \sum_{m + l = n} q^{m} (1-q)^l  \binom{n}{m}  f(i+k)
+= E_{n,q}(f)
+\end{conteq}
+\end{proof}
+
+
+
+\end{document}
+
